@@ -24,7 +24,12 @@ function computeEpicycles(points) {
     const n = nextPow2(points.length);
     const re = new Array(n).fill(0);
     const im = new Array(n).fill(0);
-    for (let i = 0; i < points.length; i++) { re[i] = points[i].x; im[i] = points[i].y; }
+
+    for (let i = 0; i < points.length; i++) {
+        re[i] = points[i].x;
+        im[i] = -points[i].y;
+    }
+
     fft(re, im);
     const cycles = [];
     for (let k = 0; k < n; k++) {
@@ -39,22 +44,92 @@ function computeEpicycles(points) {
 // ─── Parametric string ───────────────────────────────────────────────────────
 function toParametric(cycles, count) {
     const top = cycles.slice(0, count).filter(c => c.amp > 0.001);
+
+    const fmtNum = (v) => {
+        // Keep it simple for Desmos: fixed precision, avoid "-0"
+        const n = Number(v.toFixed(4));
+        return Object.is(n, -0) ? "0" : String(n);
+    };
+
+    const fmtAngle = (freq, phase) => {
+        let base = "";
+        if (freq === 0) base = "";
+        else if (freq === 1) base = "t";
+        else if (freq === -1) base = "-t";
+        else base = `${freq}t`;
+
+        const ph = Number(phase.toFixed(4));
+        const phStr = ph === 0 ? "" : (ph > 0 ? `+${fmtNum(ph)}` : `-${fmtNum(Math.abs(ph))}`);
+
+        if (!base) return phStr ? phStr.replace(/^\+/, "") : "0";
+        return phStr ? `${base}${phStr}` : base;
+    };
+
     const xTerms = top.map(c => {
-        const a = c.amp.toFixed(2);
-        const f = c.freq === 0 ? "" : c.freq === 1 ? "t" : `${c.freq}t`;
-        const ph = c.phase !== 0 ? ` + ${c.phase.toFixed(2)}` : "";
-        return f ? `${a}·cos(${f}${ph})` : a;
+        const a = fmtNum(c.amp);
+        if (c.freq === 0) return a; // DC term
+        return `${a}*cos(${fmtAngle(c.freq, c.phase)})`;
     });
+
     const yTerms = top.map(c => {
-        const a = c.amp.toFixed(2);
-        const f = c.freq === 0 ? "" : c.freq === 1 ? "t" : `${c.freq}t`;
-        const ph = c.phase !== 0 ? ` + ${c.phase.toFixed(2)}` : "";
-        return f ? `${a}·sin(${f}${ph})` : "0";
+        const a = fmtNum(c.amp);
+        if (c.freq === 0) return "0"; // DC doesn't contribute to sine in this representation
+        return `${a}*sin(${fmtAngle(c.freq, c.phase)})`;
     });
+
     return {
         x: "x(t) = " + (xTerms.join(" + ") || "0"),
         y: "y(t) = " + (yTerms.join(" + ") || "0"),
     };
+}
+
+function CopyLine({ label, value }) {
+    const [copied, setCopied] = useState(false);
+
+    const onCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            const el = document.getElementById(`copyline-${label}`);
+            if (el) {
+                el.focus();
+                el.select();
+            }
+        }
+
+        setCopied(true);
+
+        // revert back after 1.5 seconds
+        setTimeout(() => setCopied(false), 1500);
+    };
+
+    return (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#ffffff", minWidth: 70, opacity: 0.9 }}>
+                {label}
+            </div>
+            <input
+                id={`copyline-${label}`}
+                readOnly
+                value={value}
+                onFocus={(e) => e.target.select()}
+                style={{
+                    flex: 1,
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: 12,
+                    padding: "10px 12px",
+                    borderRadius: 6,
+                    border: "1px solid rgba(100,200,255,0.2)",
+                    background: "rgba(0,0,0,0.25)",
+                    color: "#ffffff",
+                    outline: "none",
+                }}
+            />
+            <button onClick={onCopy} style={btnStyle(false)}>
+                {copied ? "✓" : "COPY"}
+            </button>
+        </div>
+    );
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -148,7 +223,7 @@ export default function App() {
                 const px = x, py = y;
                 const angle = c.freq * tRef.current + c.phase;
                 x += c.amp * Math.cos(angle);
-                y += c.amp * Math.sin(angle);
+                y -= c.amp * Math.sin(angle);
                 // Circle
                 ctx.beginPath();
                 ctx.arc(px, py, c.amp, 0, 2 * Math.PI);
@@ -207,6 +282,15 @@ export default function App() {
     };
 
     const W = 900, H = 560;
+
+    const desmosTuple = (() => {
+        if (!parametric) return "";
+        const safeReplaceDot = (s) => (s || "").split("·").join("*"); // no replaceAll
+        const xExpr = safeReplaceDot(parametric.x.split("=").slice(1).join("=").trim());
+        const yExpr = safeReplaceDot(parametric.y.split("=").slice(1).join("=").trim());
+
+        return `(${xExpr}, ${yExpr})`;
+    })();
 
     return (
         <div style={{
@@ -303,6 +387,7 @@ export default function App() {
                     <div style={{ fontSize: 10, color: "#ffffff", marginTop: 10, letterSpacing: 1 }}>
                         Showing top {numCircles} frequency components · Drag the slider to change precision
                     </div>
+                    <CopyLine label="DESMOS" value={desmosTuple} />
                 </div>
             )}
         </div>
