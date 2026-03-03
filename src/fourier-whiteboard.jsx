@@ -115,7 +115,7 @@ function CopyLine({ label, value }) {
                 onFocus={(e) => e.target.select()}
                 style={{
                     flex: 1,
-                    fontFamily: "'Courier New', monospace",
+                    fontFamily: "Arial, Helvetica, sans-serif",
                     fontSize: 12,
                     padding: "10px 12px",
                     borderRadius: 6,
@@ -296,7 +296,7 @@ export default function App() {
         <div style={{
             minHeight: "100vh",
             background: "#050d14",
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "Arial, Helvetica, sans-serif",
             color: "#ffffff",
             display: "flex",
             flexDirection: "column",
@@ -332,7 +332,7 @@ export default function App() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(100,200,255,0.05)", border: "1px solid rgba(100,200,255,0.15)", borderRadius: 6, padding: "6px 14px" }}>
                     <span style={{ fontSize: 11, letterSpacing: 2, color: "#ffffff" }}>CIRCLES</span>
                     <input
-                        type="range" min={1} max={150} value={numCircles}
+                        type="range" min={1} max={200} value={numCircles}
                         onChange={e => {
                             setNumCircles(+e.target.value);
                             if (mode === "animate") {
@@ -348,7 +348,7 @@ export default function App() {
             </div>
 
             {/* Canvas */}
-            <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(100,200,255,0.2)", boxShadow: "0 0 40px rgba(100,200,255,0.07)" }}>
+            <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(100,200,255,0.2)", boxShadow: "none" }}>
                 <canvas
                     ref={drawCanvas}
                     width={W} height={H}
@@ -378,11 +378,11 @@ export default function App() {
                     background: "rgba(0,30,50,0.8)", border: "1px solid rgba(100,200,255,0.2)",
                     borderRadius: 8, padding: "16px 22px",
                 }}>
-                    <div style={{ fontSize: 10, letterSpacing: 4, color: "#ffffff", marginBottom: 10 }}>PARAMETRIC EQUATION — t ∈ [0, 2π]</div>
+                    <div style={{ fontSize: 10, letterSpacing: 4, color: "#ffffff", marginBottom: 10 }}>PARAMETRIC EQUATION: t ∈ [0, 2π]</div>
                     <div style={{ fontSize: 12, color: "#ffffff", lineHeight: 1.8, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                         <span style={{ color: "#ffffff" }}>{parametric.x}</span>
                         <br />
-                        <span style={{ color: "#ffffff" }}>{parametric.y}</span>
+                        <span style={{ color: "#ffffff", marginTop: 12, display: "inline-block" }}>{parametric.y}</span>
                     </div>
                     <div style={{ fontSize: 10, color: "#ffffff", marginTop: 10, letterSpacing: 1 }}>
                         Showing top {numCircles} frequency components · Drag the slider to change precision
@@ -399,7 +399,7 @@ function btnStyle(disabled, danger = false) {
         padding: "8px 22px",
         fontSize: 11,
         letterSpacing: 3,
-        fontFamily: "'Courier New', monospace",
+        fontFamily: "Arial, Helvetica, sans-serif",
         fontWeight: 700,
         border: `1px solid ${danger ? "rgba(255,100,100,0.4)" : "rgba(256,256,256,256)"}`,
         borderRadius: 6,
