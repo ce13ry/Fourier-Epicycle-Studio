@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-// ─── FFT ────────────────────────────────────────────────────────────────────
 function fft(re, im) {
     const n = re.length;
     if (n <= 1) return;
@@ -18,7 +17,9 @@ function fft(re, im) {
     }
 }
 
-function nextPow2(n) { let p = 1; while (p < n) p <<= 1; return p; }
+function nextPow2(n) {
+    let p = 1; while (p < n) p <<= 1; return p;
+}
 
 function computeEpicycles(points) {
     const n = nextPow2(points.length);
@@ -41,12 +42,10 @@ function computeEpicycles(points) {
     return cycles.sort((a, b) => b.amp - a.amp);
 }
 
-// ─── Parametric string ───────────────────────────────────────────────────────
 function toParametric(cycles, count) {
     const top = cycles.slice(0, count).filter(c => c.amp > 0.001);
 
     const fmtNum = (v) => {
-        // Keep it simple for Desmos: fixed precision, avoid "-0"
         const n = Number(v.toFixed(4));
         return Object.is(n, -0) ? "0" : String(n);
     };
@@ -67,13 +66,17 @@ function toParametric(cycles, count) {
 
     const xTerms = top.map(c => {
         const a = fmtNum(c.amp);
-        if (c.freq === 0) return a; // DC term
+        if (c.freq === 0) {
+            return a;
+        }
         return `${a}*cos(${fmtAngle(c.freq, c.phase)})`;
     });
 
     const yTerms = top.map(c => {
         const a = fmtNum(c.amp);
-        if (c.freq === 0) return "0"; // DC doesn't contribute to sine in this representation
+        if (c.freq === 0) {
+            return "0";
+        }
         return `${a}*sin(${fmtAngle(c.freq, c.phase)})`;
     });
 
@@ -96,10 +99,7 @@ function CopyLine({ label, value }) {
                 el.select();
             }
         }
-
         setCopied(true);
-
-        // revert back after 1.5 seconds
         setTimeout(() => setCopied(false), 1500);
     };
 
@@ -132,11 +132,10 @@ function CopyLine({ label, value }) {
     );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
 export default function App() {
     const drawCanvas = useRef(null);
     const animCanvas = useRef(null);
-    const [mode, setMode] = useState("draw"); // draw | animate
+    const [mode, setMode] = useState("draw");
     const [drawing, setDrawing] = useState(false);
     const [rawPoints, setRawPoints] = useState([]);
     const [numCircles, setNumCircles] = useState(30);
@@ -145,12 +144,45 @@ export default function App() {
     const epicyclesRef = useRef([]);
     const trailRef = useRef([]);
     const tRef = useRef(0);
+    const containerRef = useRef(null);
+    const [canvasSize, setCanvasSize] = useState({ w: 900, h: 560 });
+    const ASPECT = 900 / 560;
 
-    // ─── Draw mode ──────────────────────────────────────────────────────────
+    const resizeCanvases = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const maxW = 900;
+        const wCss = Math.min(el.clientWidth, maxW);
+        const hCss = Math.round(wCss / ASPECT);
+
+        setCanvasSize({ w: wCss, h: hCss });
+
+        const dpr = window.devicePixelRatio || 1;
+        [drawCanvas.current, animCanvas.current].forEach((c) => {
+            if (!c) return;
+            c.style.width = `${wCss}px`;
+            c.style.height = `${hCss}px`;
+            c.width = Math.round(wCss * dpr);
+            c.height = Math.round(hCss * dpr);
+
+            const ctx = c.getContext("2d");
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        });
+    }, []);
+
+    useEffect(() => {
+        resizeCanvases();
+        window.addEventListener("resize", resizeCanvases);
+        return () => window.removeEventListener("resize", resizeCanvases);
+    }, [resizeCanvases]);
     const getPos = (e, canvas) => {
         const r = canvas.getBoundingClientRect();
         const src = e.touches ? e.touches[0] : e;
-        return { x: src.clientX - r.left, y: src.clientY - r.top };
+
+        const x = (src.clientX - r.left) * (canvasSize.w / r.width);
+        const y = (src.clientY - r.top) * (canvasSize.h / r.height);
+        return { x, y };
     };
 
     const startDraw = useCallback((e) => {
@@ -180,18 +212,14 @@ export default function App() {
     }, [drawing]);
 
     const endDraw = useCallback(() => setDrawing(false), []);
-
-    // ─── Animate ─────────────────────────────────────────────────────────────
     const startAnimation = useCallback(() => {
         if (rawPoints.length < 8) return;
-        // Resample to power of 2
         const n = Math.min(nextPow2(rawPoints.length), 512);
         const step = rawPoints.length / n;
         const pts = Array.from({ length: n }, (_, i) => {
             const idx = Math.min(Math.floor(i * step), rawPoints.length - 1);
             return rawPoints[idx];
         });
-        // Center
         const cx = pts.reduce((s, p) => s + p.x, 0) / n;
         const cy = pts.reduce((s, p) => s + p.y, 0) / n;
         const centered = pts.map(p => ({ x: p.x - cx, y: p.y - cy }));
@@ -206,7 +234,7 @@ export default function App() {
         if (mode !== "animate") return;
         const canvas = animCanvas.current;
         const ctx = canvas.getContext("2d");
-        const W = canvas.width, H = canvas.height;
+        const W = canvasSize.w, H = canvasSize.h;
         const cycles = epicyclesRef.current.slice(0, numCircles);
         const speed = (2 * Math.PI) / (cycles.length > 0 ? cycles.length * 2 : 60);
 
@@ -269,7 +297,7 @@ export default function App() {
 
         animRef.current = requestAnimationFrame(draw);
         return () => cancelAnimationFrame(animRef.current);
-    }, [mode, numCircles]);
+    }, [mode, numCircles, canvasSize.w, canvasSize.h]);
 
     const reset = () => {
         cancelAnimationFrame(animRef.current);
@@ -280,8 +308,6 @@ export default function App() {
         const ctx = drawCanvas.current?.getContext("2d");
         if (ctx) ctx.clearRect(0, 0, drawCanvas.current.width, drawCanvas.current.height);
     };
-
-    const W = 900, H = 560;
 
     const desmosTuple = (() => {
         if (!parametric) return "";
@@ -348,35 +374,65 @@ export default function App() {
             </div>
 
             {/* Canvas */}
-            <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(100,200,255,0.2)", boxShadow: "none" }}>
-                <canvas
-                    ref={drawCanvas}
-                    width={W} height={H}
-                    style={{ display: mode === "draw" ? "block" : "none", background: "#060f18", cursor: "crosshair", touchAction: "none" }}
-                    onMouseDown={startDraw} onMouseMove={continueDraw} onMouseUp={endDraw} onMouseLeave={endDraw}
-                    onTouchStart={startDraw} onTouchMove={continueDraw} onTouchEnd={endDraw}
-                />
-                <canvas
-                    ref={animCanvas}
-                    width={W} height={H}
-                    style={{ display: mode === "animate" ? "block" : "none", background: "#060f18" }}
-                />
-                {mode === "draw" && rawPoints.length === 0 && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                        <div style={{ textAlign: "center", opacity: 0.3 }}>
-                            <div style={{ fontSize: 48, marginBottom: 10 }}>✏</div>
-                            <div style={{ fontSize: 13, letterSpacing: 3 }}>DRAW YOUR CURVE HERE</div>
+            <div
+                ref={containerRef}
+                style={{ width: "100%", maxWidth: 900 }}
+            >
+                <div
+                    style={{
+                        position: "relative",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        border: "1px solid rgba(100,200,255,0.2)",
+                        boxShadow: "none",
+                    }}
+                >
+                    <canvas
+                        ref={drawCanvas}
+                        style={{
+                            display: mode === "draw" ? "block" : "none",
+                            background: "#060f18",
+                            cursor: "crosshair",
+                            touchAction: "none",
+                        }}
+                        onMouseDown={startDraw}
+                        onMouseMove={continueDraw}
+                        onMouseUp={endDraw}
+                        onMouseLeave={endDraw}
+                        onTouchStart={startDraw}
+                        onTouchMove={continueDraw}
+                        onTouchEnd={endDraw}
+                    />
+                    <canvas
+                        ref={animCanvas}
+                        style={{
+                            display: mode === "animate" ? "block" : "none",
+                            background: "#060f18",
+                        }}
+                    />
+
+                    {mode === "draw" && rawPoints.length === 0 && (
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                            <div style={{ textAlign: "center", opacity: 0.3 }}>
+                                <div style={{ fontSize: 48, marginBottom: 10 }}>✏</div>
+                                <div style={{ fontSize: 13, letterSpacing: 3 }}>DRAW YOUR CURVE HERE</div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Parametric output */}
             {parametric && (
                 <div style={{
-                    marginTop: 20, maxWidth: W, width: "100%",
-                    background: "rgba(0,30,50,0.8)", border: "1px solid rgba(100,200,255,0.2)",
-                    borderRadius: 8, padding: "16px 22px",
+                    marginTop: 20,
+                    width: "100%",
+                    maxWidth: 900,
+                    boxSizing: "border-box",
+                    background: "rgba(0,30,50,0.8)",
+                    border: "1px solid rgba(100,200,255,0.2)",
+                    borderRadius: 8,
+                    padding: "16px 22px",
                 }}>
                     <div style={{ fontSize: 10, letterSpacing: 4, color: "#ffffff", marginBottom: 10 }}>PARAMETRIC EQUATION: t ∈ [0, 2π]</div>
                     <div style={{ fontSize: 12, color: "#ffffff", lineHeight: 1.8, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
